@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 class CountryStat(BaseModel):
     countryCode: str
@@ -10,11 +10,14 @@ class CountryStat(BaseModel):
     pending: int
 
 class MonthlyTrend(BaseModel):
+    model_config = ConfigDict(extra='allow')
+    
     month: str
     AO: int = 0
     NG: int = 0
     PT: int = 0
     SA: int = 0
+    GR: int = 0
 
 class DocTypeStat(BaseModel):
     type: str
