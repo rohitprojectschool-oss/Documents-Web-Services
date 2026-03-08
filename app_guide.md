@@ -23,9 +23,16 @@ This is the backend for Crimson, a multi-country e-invoicing platform. It is bui
 - [x] Database session management with SQLAlchemy and `get_db` dependency.
 - [x] Declarative base and naming conventions for SAP HANA (UPPER_SNAKE_CASE).
 - [x] Initial SQLAlchemy model for Customers.
+- [x] Deployment ready (Dockerfile + Render).
 - [ ] Implement CRUD for Customers using real DB session.
 - [ ] Migrate other endpoints (Invoices, Analytics) to DB models.
 - [ ] SAP HANA DB connection validation.
+
+## Deployment (Render)
+- **Runtime:** Docker
+- **Build Command:** Auto-detected from `Dockerfile`
+- **Environment Variables:** `HANA_DB_HOST`, `HANA_DB_PORT`, `HANA_DB_USER`, `HANA_DB_PASSWORD`, `HANA_DB_SCHEMA`
+- **Backend URL:** `https://documents-web-services.onrender.com`
 
 ## API Endpoints (Planned/Initial)
 - `/auth/me`: Current user profile.
