@@ -34,13 +34,14 @@ This is the backend for Crimson, a multi-country e-invoicing platform. It is bui
 - **Environment Variables:** `HANA_DB_HOST`, `HANA_DB_PORT`, `HANA_DB_USER`, `HANA_DB_PASSWORD`, `HANA_DB_SCHEMA`
 - **Backend URL:** `https://documents-web-services.onrender.com`
 
-## API Endpoints (Planned/Initial)
+## API Endpoints (Live)
 - `/auth/me`: Current user profile.
 - `/api/country-settings/public`: Public country settings.
-- `/api/invoices`: Document list.
-- `/api/customers`: Customer directory.
+- `/api/invoices`: [GET] List all / [POST] Upload new invoice.
+- `/api/customers`: [GET] List all / [POST] Create new customer.
 - `/api/analytics`: Stats and chart data.
 - `/api/settings`: User/Account settings.
+- `/health`: DB connection check.
 
 ## Environment Variables
 - `HANA_DB_HOST`: SAP HANA host.
