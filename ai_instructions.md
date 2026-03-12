@@ -7,13 +7,21 @@ Follow these instructions when building the backend:
     *   `app/models/`: Database schema definitions.
     *   `app/schemas/`: API payload validation and serialization.
     *   `app/api/endpoints/`: Routing and controller logic.
-3.  **HANA DB Integration:** 
-    *   Use SQLAlchemy with the `sqlalchemy-hana` dialect for all database interactions.
-    *   **Always** use the `get_db` dependency (`Depends(get_db)`) to manage database sessions in route handlers to ensure proper connection lifecycle management.
-    *   Leverage SQLAlchemy's ORM for CRUD operations and aggregations; avoid raw SQL strings where possible.
-4.  **Data Flow (Model -> Schema):** Ensure raw data retrieved via SQLAlchemy `Models` is explicitly transformed and serialized using Pydantic `Schemas` before being returned to the frontend.
-5.  **Error Handling:** Use FastAPI's `HTTPException` with appropriate status codes and detail messages for API errors. Log actual exceptions internally.
-6.  **Documentation:** Keep the `app_guide` updated with all API changes, architectural decisions, and setup processes.
-7.  **Security:** Ensure sensitive configuration (like HANA credentials) is loaded via `pydantic-settings` from environment variables, never hardcoded.
-8.  **Async First:** Prefer `async def` for route handlers. When performing heavy synchronous DB operations, ensure they don't excessively block the event loop.
-9.  **Pydantic V2:** Utilize Pydantic V2 features for accurate and efficient data validation.
+3.  **Database Integration (PostgreSQL/HANA):** 
+    *   Use SQLAlchemy for all database interactions.
+    *   **Always** use the `get_db` dependency (`Depends(get_db)`) to manage database sessions.
+4.  **Binary File Storage:**
+    *   Store invoice attachments as binary data in the database using the `LargeBinary` column type (`BYTEA` in PostgreSQL).
+    *   Always store accompanying metadata: `FILE_NAME`, `FILE_MIME_TYPE`.
+    *   Serve files via a dedicated endpoint using `Response(content=inv.FILE_CONTENT, ...)` to avoid loading issues with large objects.
+5.  **URL Generation & Routing:**
+    *   Generate **absolute URLs** for file attachments using `request.base_url` to ensure compatibility with frontends on different ports/domains.
+    *   Use path-based routing for IDs that may contain slashes (e.g., `@router.get("/{doc_id:path}/file")`).
+    *   When generating URLs for paths with slashes, use `quote(id, safe='/')` to ensure spaces are encoded but slashes remain literal for the `:path` match.
+6.  **HTTP Header Safety:**
+    *   Sanitize filenames in `Content-Disposition` headers to avoid `UnicodeEncodeError`. 
+    *   Always provide an ASCII-only `filename="..."` and a UTF-8 encoded `filename*=UTF-8''..."`.
+7.  **Data Flow (Model -> Schema):** Ensure raw data retrieved via SQLAlchemy `Models` is explicitly transformed and serialized using Pydantic `Schemas`.
+8.  **Error Handling:** Use FastAPI's `HTTPException` with appropriate status codes.
+9.  **Async First:** Prefer `async def` for route handlers.
+10. **Pydantic V2:** Utilize Pydantic V2 features for accurate validation.

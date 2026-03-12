@@ -4,19 +4,24 @@
     *   Variables/Functions: `snake_case`
     *   Classes: `PascalCase`
     *   Constants: `UPPER_SNAKE_CASE`
-    *   **Database Tables/Columns:** Use `UPPER_SNAKE_CASE` (e.g., `CUSTOMER_ID`, `DOC_STATUS`) to align strictly with SAP HANA standard conventions.
+    *   **Database Tables/Columns:** Use `UPPER_SNAKE_CASE` (e.g., `CUSTOMER_ID`, `DOC_STATUS`).
 2.  **File Layout:**
     *   `app/api/endpoints/`: Route handlers.
-    *   `app/schemas/`: Pydantic models for UI data contracts (DTOs).
-    *   `app/models/`: SQLAlchemy models for database entities.
-    *   `app/core/`: Configuration (`config.py`), security, and constants.
-    *   `app/db/`: Database session (`session.py`), declarative base (`base_class.py`), and setup/seed scripts.
+    *   `app/schemas/`: Pydantic models (DTOs).
+    *   `app/models/`: SQLAlchemy database entities.
+    *   `app/core/`: Configuration, security, constants.
+    *   `app/db/`: Session, base classes, setup/seed scripts.
 3.  **API Response Structure:**
-    *   Successful: `{"status": true, "data": ...}` or `{"success": true, "message": "...", "data": ...}` to match established frontend contracts.
-    *   Error: `{"status": false, "message": "...", "error": "..."}` or standard FastAPI JSON error responses.
-4.  **Type Hinting:** Mandatory for all function signatures and class members to ensure static analysis and documentation accuracy.
-5.  **Logging:** Use Python's standard `logging` module for operational insights and error tracking.
-6.  **Database Management:**
+    *   Successful: `{"status": true, "data": ...}` or `{"success": true, "message": "...", "data": ...}`.
+    *   Error: `{"status": false, "message": "...", "error": "..."}`.
+4.  **Binary Content Handling:**
+    *   Store as `LargeBinary` in SQLAlchemy models.
+    *   Fetch only as needed in separate dedicated download/view endpoints.
+    *   Use `urllib.parse.quote` for encoding path IDs that may contain spaces or slashes.
+    *   **ALWAYS** use `filename*=UTF-8''` parameter in `Content-Disposition` for filenames.
+5.  **Type Hinting:** Mandatory for all signatures and class members.
+6.  **Logging & Debugging:** Use standard `logging` and avoid persistent `print` statements in production.
+7.  **Database Management:**
     *   Use `app.db.setup_db` for initial table creation.
-    *   Use `app.db.seed_db` for populating initial data.
-7.  **Docstrings:** Use Google-style docstrings for all public functions and classes to clarify intent and usage.
+    *   PostgreSQL is primary; SAP HANA is legacy fallback.
+8.  **Docstrings:** Google-style docstrings for all public components.
