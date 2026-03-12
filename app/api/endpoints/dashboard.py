@@ -1,29 +1,33 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, select, desc
 from app.db.session import get_db
 from app.models.invoice import Invoice
 from app.schemas.dashboard import DashboardResponse, DashboardData, StatsSummary, ActivityPoint, CountryShare, DocTypeShare, RecentDocument
 from typing import List, Optional
 from datetime import datetime, timedelta
+from urllib.parse import quote
 
 router = APIRouter()
 
-def get_file_url(request: Request, inv: Invoice):
-    if not inv.HAS_ATTACHMENT or not inv.FILE_CONTENT:
+def get_file_url(inv_doc_id: str, has_attachment: bool):
+    if not has_attachment:
         return None
-    base_url = str(request.base_url).rstrip("/")
-    return f"{base_url}/api/invoices/{inv.DOC_ID}/file"
+    safe_doc_id = quote(inv_doc_id, safe='/')
+    return f"/api/invoices/{safe_doc_id}/file"
 
 @router.get("", response_model=DashboardResponse)
-async def get_dashboard(request: Request, db: Session = Depends(get_db)):
-    """Fetch real-time dashboard analytics."""
+async def get_dashboard(db: Session = Depends(get_db)):
+    """Fetch dashboard analytics with optimized performance."""
     try:
-        # 1. Calculate Stats Summary
-        total_docs = db.query(Invoice).count()
-        pending = db.query(Invoice).filter(Invoice.STATUS == "pending").count()
-        accepted = db.query(Invoice).filter(Invoice.STATUS == "accepted").count()
-        rejected = db.query(Invoice).filter(Invoice.STATUS == "rejected").count()
+        # 1. OPTIMIZED STATS: Get all counts in a single query using grouping
+        status_counts = db.query(Invoice.STATUS, func.count(Invoice.DOC_ID)).group_by(Invoice.STATUS).all()
+        counts_dict = dict(status_counts)
+        
+        pending = counts_dict.get("pending", 0)
+        accepted = counts_dict.get("accepted", 0)
+        rejected = counts_dict.get("rejected", 0)
+        total_docs = sum(counts_dict.values())
 
         stats = StatsSummary(
             totalDocuments=total_docs,
@@ -32,30 +36,39 @@ async def get_dashboard(request: Request, db: Session = Depends(get_db)):
             rejected=rejected
         )
 
-        # 2. Fetch Recent Documents (limit to 5)
-        db_recent = db.query(Invoice).order_by(Invoice.CREATED_AT.desc()).limit(5).all()
-        recent_documents = []
-        for inv in db_recent:
-            recent_documents.append(RecentDocument(
-                docId=inv.DOC_ID,
-                sourceReference=inv.SOURCE_REFERENCE or "",
-                customer=inv.CUSTOMER_NAME,
-                grossAmount=f"{float(inv.GROSS_AMOUNT):.2f}",
-                created=inv.CREATED_AT.strftime("%b %d, %Y"),
-                status=inv.STATUS,
-                docType=inv.DOC_TYPE,
-                hasAttachment=inv.HAS_ATTACHMENT and inv.FILE_CONTENT is not None,
-                fileUrl=get_file_url(request, inv)
-            ))
+        # 2. OPTIMIZED RECENT DOCUMENTS: Exclude LargeBinary (FILE_CONTENT)
+        stmt = select(
+            Invoice.DOC_ID,
+            Invoice.SOURCE_REFERENCE,
+            Invoice.CUSTOMER_NAME,
+            Invoice.GROSS_AMOUNT,
+            Invoice.CREATED_AT,
+            Invoice.STATUS,
+            Invoice.DOC_TYPE,
+            Invoice.HAS_ATTACHMENT
+        ).order_by(desc(Invoice.CREATED_AT)).limit(5)
+        
+        db_recent = db.execute(stmt).all()
+        recent_documents = [RecentDocument(
+            docId=row.DOC_ID,
+            sourceReference=row.SOURCE_REFERENCE or "",
+            customer=row.CUSTOMER_NAME,
+            grossAmount=f"{float(row.GROSS_AMOUNT):.2f}",
+            created=row.CREATED_AT.strftime("%b %d, %Y"),
+            status=row.STATUS,
+            docType=row.DOC_TYPE,
+            hasAttachment=row.HAS_ATTACHMENT,
+            fileUrl=get_file_url(row.DOC_ID, row.HAS_ATTACHMENT)
+        ) for row in db_recent]
 
-        # 3. Country Distribution
+        # 3. Country Distribution (Already grouped, but use total_docs from above)
         country_agg = db.query(
             Invoice.COUNTRY_NAME, 
             func.count(Invoice.DOC_ID)
         ).group_by(Invoice.COUNTRY_NAME).all()
         
         country_data = []
-        colors = ['#e53e3e', '#4299e1', '#48bb78', '#ecc94b']
+        colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b']
         for i, (name, count) in enumerate(country_agg):
             percentage = round((count / total_docs) * 100) if total_docs > 0 else 0
             country_data.append(CountryShare(
@@ -79,17 +92,25 @@ async def get_dashboard(request: Request, db: Session = Depends(get_db)):
                 color=colors[i % len(colors)]
             ))
 
-        # 5. Activity Data (Last 7 days)
+        # 5. OPTIMIZED ACTIVITY DATA: Single query for last 7 days
+        seven_days_ago = datetime.utcnow().date() - timedelta(days=6)
+        activity_agg = db.query(
+            func.date(Invoice.CREATED_AT).label('day'),
+            func.count(Invoice.DOC_ID)
+        ).filter(func.date(Invoice.CREATED_AT) >= seven_days_ago)\
+         .group_by(func.date(Invoice.CREATED_AT))\
+         .order_by('day').all()
+        
+        activity_dict = {day.strftime("%b %d"): count for day, count in activity_agg}
+        
         activity_data = []
         for i in range(6, -1, -1):
             date = datetime.utcnow() - timedelta(days=i)
             date_str = date.strftime("%b %d")
-            
-            count = db.query(Invoice).filter(
-                func.date(Invoice.CREATED_AT) == date.date()
-            ).count()
-            
-            activity_data.append(ActivityPoint(date=date_str, count=count))
+            activity_data.append(ActivityPoint(
+                date=date_str, 
+                count=activity_dict.get(date_str, 0)
+            ))
 
         data = DashboardData(
             stats=stats,
@@ -100,4 +121,5 @@ async def get_dashboard(request: Request, db: Session = Depends(get_db)):
         )
         return DashboardResponse(status=True, data=data)
     except Exception as e:
+        print(f"ERROR in dashboard: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")

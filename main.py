@@ -1,11 +1,15 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.db.session import get_db
 from app.api.endpoints import auth, countries, invoices, customers, analytics, settings, users, dashboard
 
 app = FastAPI(title="Crimson E-Invoicing Backend", version="1.0.0")
+
+# Add Gzip Compression for large responses
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # CORS Configuration
 # When allow_credentials=True, allow_origins cannot be ["*"]
