@@ -2,8 +2,9 @@ from pydantic_settings import BaseSettings
 from typing import Optional
 
 class Settings(BaseSettings):
-    # PostgreSQL Configuration (New Default)
-    DATABASE_URL: str = "postgresql://postgres:password@localhost:5432/postgres"
+    # PostgreSQL Configuration
+    # Defaults to production URL if not provided by environment
+    DATABASE_URL: str = "postgresql://documents_web_db_user:9VV8ybPm54i17j2XcVyV4P5CTKewMO41@dpg-d6oq89s50q8c739u8ddg-a.oregon-postgres.render.com/documents_web_db"
 
     # SAP HANA Configuration (Kept for legacy/optional use)
     HANA_DB_HOST: Optional[str] = None

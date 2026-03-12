@@ -1,31 +1,34 @@
-# Use official Python image
-FROM python:3.11-slim
+# Stage 1: Build Frontend
+FROM node:20-slim AS frontend-build
+WORKDIR /frontend
+# Using public URL for the build to avoid auth issues in Docker
+RUN apt-get update && apt-get install -y git
+RUN git clone https://github.com/rohitprojectschool-oss/Documents-Web-UI.git .
+RUN npm install
+RUN npm run build
 
-# Set environment variables
+# Stage 2: Final Backend Image
+FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 ENV PORT 8000
-
-# Set work directory
 WORKDIR /app
 
-# Install system dependencies (needed for some Python packages)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+# Copy backend requirements and install
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy project
+# Copy backend code
 COPY . .
 
-# Expose the port
-EXPOSE 8000
+# Copy built frontend from Stage 1
+COPY --from=frontend-build /frontend/dist ./dist
 
-# Run the application
-# Using 0.0.0.0 is mandatory for Render to route traffic correctly
+EXPOSE 8000
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
