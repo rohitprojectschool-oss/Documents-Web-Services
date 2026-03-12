@@ -10,14 +10,16 @@ from urllib.parse import quote
 
 router = APIRouter()
 
-def get_file_url(inv_doc_id: str, has_attachment: bool):
+def get_file_url(request: Request, inv_doc_id: str, has_attachment: bool):
     if not has_attachment:
         return None
-    safe_doc_id = quote(inv_doc_id, safe='/')
-    return f"/api/invoices/{safe_doc_id}/file"
+    # Use request.base_url for absolute URL and match the format in invoices.py
+    base_url = str(request.base_url).rstrip("/")
+    safe_doc_id = quote(inv_doc_id)
+    return f"{base_url}/api/invoices/attachment?docId={safe_doc_id}"
 
 @router.get("", response_model=DashboardResponse)
-async def get_dashboard(db: Session = Depends(get_db)):
+async def get_dashboard(request: Request, db: Session = Depends(get_db)):
     """Fetch dashboard analytics with optimized performance."""
     try:
         # 1. OPTIMIZED STATS: Get all counts in a single query using grouping
@@ -58,17 +60,17 @@ async def get_dashboard(db: Session = Depends(get_db)):
             status=row.STATUS,
             docType=row.DOC_TYPE,
             hasAttachment=row.HAS_ATTACHMENT,
-            fileUrl=get_file_url(row.DOC_ID, row.HAS_ATTACHMENT)
+            fileUrl=get_file_url(request, row.DOC_ID, row.HAS_ATTACHMENT)
         ) for row in db_recent]
 
-        # 3. Country Distribution (Already grouped, but use total_docs from above)
+        # 3. Country Distribution
         country_agg = db.query(
             Invoice.COUNTRY_NAME, 
             func.count(Invoice.DOC_ID)
         ).group_by(Invoice.COUNTRY_NAME).all()
         
         country_data = []
-        colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b']
+        colors = ['#e53e3e', '#4299e1', '#48bb78', '#ecc94b']
         for i, (name, count) in enumerate(country_agg):
             percentage = round((count / total_docs) * 100) if total_docs > 0 else 0
             country_data.append(CountryShare(

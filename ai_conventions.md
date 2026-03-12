@@ -16,8 +16,9 @@
     *   Error: `{"status": false, "message": "...", "error": "..."}`.
 4.  **Binary Content Handling:**
     *   Store as `LargeBinary` in SQLAlchemy models.
+    *   **CRITICAL:** When querying lists of objects containing `LargeBinary` columns, ALWAYS use `sqlalchemy.orm.defer(Model.FILE_CONTENT)` or explicit `select(...)` to exclude the heavy binary data, otherwise list endpoints will be extremely slow.
     *   Fetch only as needed in separate dedicated download/view endpoints.
-    *   Use `urllib.parse.quote` for encoding path IDs that may contain spaces or slashes.
+    *   Use query parameters (e.g. `?docId=...`) instead of path parameters (`/{docId}`) when IDs can contain slashes, as path-based routing is prone to proxy/browser bugs with double-encoded slashes.
     *   **ALWAYS** use `filename*=UTF-8''` parameter in `Content-Disposition` for filenames.
 5.  **Type Hinting:** Mandatory for all signatures and class members.
 6.  **Logging & Debugging:** Use standard `logging` and avoid persistent `print` statements in production.

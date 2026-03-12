@@ -6,32 +6,29 @@ from app.db.session import get_db
 from app.models.invoice import Invoice
 import random
 from datetime import datetime
+from typing import Optional
 from app.schemas.invoice import InvoicesResponse, Invoice as InvoiceSchema, InvoiceResponse
 from urllib.parse import quote, unquote
 
 router = APIRouter()
 
-def get_file_url(inv_doc_id: str, has_attachment: bool):
+def get_file_url(request: Request, inv_doc_id: str, has_attachment: bool):
     if not has_attachment:
         return None
-    # Use a relative URL. The frontend will prepend the correct BASE_URL.
-    # This prevents the "localhost" issue in production.
-    safe_doc_id = quote(inv_doc_id, safe='/')
-    return f"/api/invoices/{safe_doc_id}/file"
+    # Use request.base_url to ensure the URL is absolute and matches the backend's address.
+    # We use a query parameter for docId because it's much safer than path parameters when IDs contain slashes.
+    base_url = str(request.base_url).rstrip("/")
+    safe_doc_id = quote(inv_doc_id)
+    return f"{base_url}/api/invoices/attachment?docId={safe_doc_id}"
 
-@router.get("/{doc_id:path}/file")
-async def download_document(doc_id: str, db: Session = Depends(get_db)):
-    """Serve document content directly from DB using the path-based URL."""
-    # Try direct match
-    inv = db.query(Invoice).filter(Invoice.DOC_ID == doc_id).first()
-    
-    # If not found, it might be double-encoded in the URL
-    if not inv and '%' in doc_id:
-        decoded_id = unquote(doc_id)
-        inv = db.query(Invoice).filter(Invoice.DOC_ID == decoded_id).first()
+@router.get("/attachment")
+async def download_document(docId: str, db: Session = Depends(get_db)):
+    """Serve document content directly from DB using the docId query parameter."""
+    # docId is already unquoted by FastAPI for query parameters
+    inv = db.query(Invoice).filter(Invoice.DOC_ID == docId).first()
     
     if not inv:
-        raise HTTPException(status_code=404, detail=f"Invoice record '{doc_id}' not found")
+        raise HTTPException(status_code=404, detail=f"Invoice record '{docId}' not found")
     
     if not inv.FILE_CONTENT:
         raise HTTPException(status_code=404, detail="File content missing")
@@ -50,12 +47,19 @@ async def download_document(doc_id: str, db: Session = Depends(get_db)):
     )
 
 @router.get("", response_model=InvoicesResponse)
-async def get_invoices(db: Session = Depends(get_db)):
-    """Fetch all invoices from DB efficiently."""
+async def get_invoices(
+    request: Request, 
+    status: Optional[str] = None,
+    countryCode: Optional[str] = None,
+    docType: Optional[str] = None,
+    startDate: Optional[str] = None,
+    endDate: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Fetch invoices from DB with filtering."""
     try:
         # PERFORMANCE FIX: We EXCLUDE FILE_CONTENT from the list query.
-        # Fetching 7MB blobs for every row in a list is what makes it "notoriously slow".
-        stmt = select(
+        query = select(
             Invoice.DOC_ID,
             Invoice.SOURCE_REFERENCE,
             Invoice.CUSTOMER_NAME,
@@ -67,7 +71,33 @@ async def get_invoices(db: Session = Depends(get_db)):
             Invoice.COUNTRY_NAME,
             Invoice.HAS_ATTACHMENT
         )
-        results = db.execute(stmt).all()
+
+        # Apply Filters
+        if status:
+            query = query.where(Invoice.STATUS == status)
+        if countryCode:
+            query = query.where(Invoice.COUNTRY_CODE == countryCode)
+        if docType:
+            query = query.where(Invoice.DOC_TYPE == docType)
+        if startDate:
+            try:
+                start_dt = datetime.strptime(startDate, "%Y-%m-%d")
+                query = query.where(Invoice.CREATED_AT >= start_dt)
+            except ValueError:
+                pass # Or raise error
+        if endDate:
+            try:
+                end_dt = datetime.strptime(endDate, "%Y-%m-%d")
+                # Include the full end day
+                end_dt = end_dt.replace(hour=23, minute=59, second=59)
+                query = query.where(Invoice.CREATED_AT <= end_dt)
+            except ValueError:
+                pass
+
+        # Order by newest first
+        query = query.order_by(Invoice.CREATED_AT.desc())
+        
+        results = db.execute(query).all()
         
         invoices = [InvoiceSchema(
             docId=row.DOC_ID,
@@ -80,15 +110,17 @@ async def get_invoices(db: Session = Depends(get_db)):
             countryCode=row.COUNTRY_CODE,
             countryName=row.COUNTRY_NAME,
             hasAttachment=row.HAS_ATTACHMENT,
-            fileUrl=get_file_url(row.DOC_ID, row.HAS_ATTACHMENT)
+            fileUrl=get_file_url(request, row.DOC_ID, row.HAS_ATTACHMENT)
         ) for row in results]
         
         return InvoicesResponse(status=True, data=invoices)
     except Exception as e:
+        print(f"ERROR in get_invoices: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.post("", response_model=InvoiceResponse)
 async def upload_invoice(
+    request: Request,
     sourceReference: str = Form(...),
     customer: str = Form(...),
     grossAmount: float = Form(...),
@@ -139,7 +171,7 @@ async def upload_invoice(
                 countryCode=new_invoice.COUNTRY_CODE,
                 countryName=new_invoice.COUNTRY_NAME,
                 hasAttachment=True,
-                fileUrl=get_file_url(new_invoice.DOC_ID, True)
+                fileUrl=get_file_url(request, new_invoice.DOC_ID, True)
             )
         )
     except Exception as e:

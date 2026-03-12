@@ -24,12 +24,13 @@ This is the backend for Crimson, a multi-country e-invoicing platform. It is bui
 - [x] Database session management with SQLAlchemy and `get_db`.
 - [x] Initial SQLAlchemy models for Customers and Invoices.
 - [x] Binary storage for invoice attachments (stored as `BYTEA` in DB).
+- [x] Performance optimizations (deferring large binary columns in lists, consolidating query counts).
 - [x] Absolute URL generation for attachments using `request.base_url`.
-- [x] Path-based route matching (`:path`) to support IDs with slashes.
+- [x] Query-parameter based routing (`?docId=...`) to safely support IDs with slashes.
 - [x] Filename sanitization to prevent UnicodeEncodeErrors in headers.
 - [x] Deployment ready (Dockerfile + Render).
-- [ ] Implement CRUD for Customers using real DB session.
-- [ ] Migrate other endpoints (Analytics) to DB models.
+- [x] Implement full CRUD for Customers using real DB session.
+- [x] Implemented filtering on Invoice listing endpoint.
 
 ## Deployment (Render)
 - **Runtime:** Docker
@@ -40,9 +41,9 @@ This is the backend for Crimson, a multi-country e-invoicing platform. It is bui
 ## API Endpoints (Live)
 - `/auth/me`: Current user profile.
 - `/api/country-settings/public`: Public country settings.
-- `/api/invoices`: [GET] List all / [POST] Upload new invoice.
-- `/api/invoices/{doc_id:path}/file`: [GET] Fetch invoice attachment from DB.
-- `/api/customers`: [GET] List all / [POST] Create new customer.
+- `/api/invoices`: [GET] List all (supports filtering via `status`, `countryCode`, `docType`, `startDate`, `endDate`) / [POST] Upload new invoice.
+- `/api/invoices/attachment?docId=...`: [GET] Fetch invoice attachment from DB.
+- `/api/customers`: [GET] List all / [POST] Create new customer / [PUT] Update customer / [DELETE] Delete customer.
 - `/api/analytics`: Stats and chart data.
 - `/api/settings`: User/Account settings.
 - `/health`: DB connection check.
