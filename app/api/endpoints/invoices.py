@@ -58,6 +58,7 @@ async def get_invoices(
 ):
     """Fetch invoices from DB with filtering."""
     try:
+        print(f"DEBUG: get_invoices called with status={status}, countryCode={countryCode}, startDate={startDate}, endDate={endDate}")
         # PERFORMANCE FIX: We EXCLUDE FILE_CONTENT from the list query.
         query = select(
             Invoice.DOC_ID,
@@ -82,22 +83,34 @@ async def get_invoices(
         if startDate:
             try:
                 start_dt = datetime.strptime(startDate, "%Y-%m-%d")
+                print(f"DEBUG: Filtering from {start_dt}")
                 query = query.where(Invoice.CREATED_AT >= start_dt)
             except ValueError:
-                pass # Or raise error
+                print(f"DEBUG: Invalid startDate format: {startDate}")
         if endDate:
             try:
                 end_dt = datetime.strptime(endDate, "%Y-%m-%d")
                 # Include the full end day
                 end_dt = end_dt.replace(hour=23, minute=59, second=59)
+                print(f"DEBUG: Filtering to {end_dt}")
                 query = query.where(Invoice.CREATED_AT <= end_dt)
             except ValueError:
-                pass
+                print(f"DEBUG: Invalid endDate format: {endDate}")
 
         # Order by newest first
         query = query.order_by(Invoice.CREATED_AT.desc())
         
         results = db.execute(query).all()
+        print(f"DEBUG: Found {len(results)} matching invoices")
+        if len(results) > 0:
+            print(f"DEBUG: First record date: {results[0].CREATED_AT}")
+        else:
+            # Check if any invoices exist at all without filters
+            all_count = db.query(Invoice).count()
+            print(f"DEBUG: Total records in DB (no filters): {all_count}")
+            if all_count > 0:
+                latest = db.query(Invoice).order_by(Invoice.CREATED_AT.desc()).first()
+                print(f"DEBUG: Latest record in DB is from: {latest.CREATED_AT}")
         
         invoices = [InvoiceSchema(
             docId=row.DOC_ID,

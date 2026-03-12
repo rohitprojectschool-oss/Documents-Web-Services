@@ -54,6 +54,42 @@ def seed_db():
         # Add sample invoices
         invoices_data = [
             {
+                "DOC_ID": "FT AO/2026/001",
+                "SOURCE_REFERENCE": "March-01",
+                "CUSTOMER_NAME": "March Customer",
+                "GROSS_AMOUNT": 1200.00,
+                "STATUS": "accepted",
+                "DOC_TYPE": "Standard Invoice",
+                "COUNTRY_CODE": "AO",
+                "COUNTRY_NAME": "Angola",
+                "HAS_ATTACHMENT": True,
+                "CREATED_AT": datetime(2026, 3, 12, 10, 0, 0)
+            },
+            {
+                "DOC_ID": "FT NG/2026/005",
+                "SOURCE_REFERENCE": "March-05",
+                "CUSTOMER_NAME": "Acme NG",
+                "GROSS_AMOUNT": 5500.00,
+                "STATUS": "pending",
+                "DOC_TYPE": "Standard Invoice",
+                "COUNTRY_CODE": "NG",
+                "COUNTRY_NAME": "Nigeria",
+                "HAS_ATTACHMENT": False,
+                "CREATED_AT": datetime(2026, 3, 12, 11, 0, 0)
+            },
+            {
+                "DOC_ID": "FT GR/2026/99",
+                "SOURCE_REFERENCE": "Old-01",
+                "CUSTOMER_NAME": "Ancient Greek",
+                "GROSS_AMOUNT": 999.99,
+                "STATUS": "rejected",
+                "DOC_TYPE": "Debit Note",
+                "COUNTRY_CODE": "GR",
+                "COUNTRY_NAME": "Greece",
+                "HAS_ATTACHMENT": True,
+                "CREATED_AT": datetime(2026, 1, 15, 9, 0, 0)
+            },
+            {
                 "DOC_ID": "FT FT3926S2781N/151",
                 "SOURCE_REFERENCE": "Test Round",
                 "CUSTOMER_NAME": "Test 1234",

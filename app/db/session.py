@@ -5,7 +5,7 @@ from app.core.config import settings
 # Create the SQLAlchemy engine for PostgreSQL
 engine = create_engine(
     settings.DATABASE_URL,
-    echo=False, # Disable SQL logging for significant performance boost
+    echo=True, # Log SQL queries for development
     pool_size=10,
     max_overflow=20
 )
