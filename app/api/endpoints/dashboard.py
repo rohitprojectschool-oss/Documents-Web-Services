@@ -1,16 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.db.session import get_db
 from app.models.invoice import Invoice
 from app.schemas.dashboard import DashboardResponse, DashboardData, StatsSummary, ActivityPoint, CountryShare, DocTypeShare, RecentDocument
-from typing import List
+from typing import List, Optional
+from datetime import datetime, timedelta
 
 router = APIRouter()
 
+def get_file_url(request: Request, inv: Invoice):
+    if not inv.HAS_ATTACHMENT or not inv.FILE_CONTENT:
+        return None
+    base_url = str(request.base_url).rstrip("/")
+    return f"{base_url}/api/invoices/{inv.DOC_ID}/file"
+
 @router.get("", response_model=DashboardResponse)
-async def get_dashboard(db: Session = Depends(get_db)):
-    """Fetch real-time dashboard analytics from SAP HANA."""
+async def get_dashboard(request: Request, db: Session = Depends(get_db)):
+    """Fetch real-time dashboard analytics."""
     try:
         # 1. Calculate Stats Summary
         total_docs = db.query(Invoice).count()
@@ -36,10 +43,12 @@ async def get_dashboard(db: Session = Depends(get_db)):
                 grossAmount=f"{float(inv.GROSS_AMOUNT):.2f}",
                 created=inv.CREATED_AT.strftime("%b %d, %Y"),
                 status=inv.STATUS,
-                docType=inv.DOC_TYPE
+                docType=inv.DOC_TYPE,
+                hasAttachment=inv.HAS_ATTACHMENT and inv.FILE_CONTENT is not None,
+                fileUrl=get_file_url(request, inv)
             ))
 
-        # 3. Country Distribution (Aggregate by Country)
+        # 3. Country Distribution
         country_agg = db.query(
             Invoice.COUNTRY_NAME, 
             func.count(Invoice.DOC_ID)
@@ -70,12 +79,17 @@ async def get_dashboard(db: Session = Depends(get_db)):
                 color=colors[i % len(colors)]
             ))
 
-        # Placeholder for Activity Data (This requires time-series aggregation)
-        activity_data = [
-            ActivityPoint(date='Mar 6', count=0),
-            ActivityPoint(date='Mar 7', count=0),
-            ActivityPoint(date='Mar 8', count=total_docs),
-        ]
+        # 5. Activity Data (Last 7 days)
+        activity_data = []
+        for i in range(6, -1, -1):
+            date = datetime.utcnow() - timedelta(days=i)
+            date_str = date.strftime("%b %d")
+            
+            count = db.query(Invoice).filter(
+                func.date(Invoice.CREATED_AT) == date.date()
+            ).count()
+            
+            activity_data.append(ActivityPoint(date=date_str, count=count))
 
         data = DashboardData(
             stats=stats,

@@ -14,11 +14,18 @@ app.add_middleware(
     allow_origins=[
         "https://documents-web-ui.vercel.app",
         "http://localhost:5173",
-        "http://127.0.0.1:5173"
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000"
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Set-Cookie"],
 )
 
 # API Routes
@@ -39,8 +46,8 @@ async def root():
 async def health_check(db: Session = Depends(get_db)):
     """Check database connectivity."""
     try:
-        # Simple query to check if SAP HANA is responsive
-        db.execute(text("SELECT 1 FROM DUMMY"))
+        # Simple query to check if database is responsive
+        db.execute(text("SELECT 1"))
         return {"status": "healthy", "database": "connected"}
     except Exception as e:
         return {"status": "unhealthy", "database": str(e)}

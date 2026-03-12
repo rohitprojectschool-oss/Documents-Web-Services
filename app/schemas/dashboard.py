@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 
 class StatsSummary(BaseModel):
@@ -29,6 +29,8 @@ class RecentDocument(BaseModel):
     created: str
     status: str
     docType: str
+    hasAttachment: bool
+    fileUrl: Optional[str] = None
 
 class DashboardData(BaseModel):
     stats: StatsSummary

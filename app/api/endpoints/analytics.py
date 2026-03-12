@@ -49,9 +49,8 @@ async def get_analytics(db: Session = Depends(get_db)):
         ]
 
         # 3. Monthly Trends
-        # For SAP HANA, we use MONTHNAME or similar. 
-        # Using a subquery/label approach for grouping.
-        month_label = func.monthname(Invoice.CREATED_AT).label('month')
+        # For PostgreSQL, we use to_char to get the abbreviated month name (e.g., 'Jan')
+        month_label = func.to_char(Invoice.CREATED_AT, 'Mon').label('month')
         monthly_agg = db.query(
             month_label,
             Invoice.COUNTRY_CODE,
@@ -60,8 +59,7 @@ async def get_analytics(db: Session = Depends(get_db)):
 
         trends_map = {}
         for row in monthly_agg:
-            # Format month to 3 chars if needed (e.g. "January" -> "Jan")
-            m = row.month[:3] if row.month else "Unk"
+            m = row.month or "Unk"
             if m not in trends_map:
                 trends_map[m] = {"month": m}
             trends_map[m][row.COUNTRY_CODE] = int(row.count)

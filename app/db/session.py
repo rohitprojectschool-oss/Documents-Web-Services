@@ -2,10 +2,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 
-# Create the SQLAlchemy engine for SAP HANA
-# Connect to the HANA database using the provided URL
+# Create the SQLAlchemy engine for PostgreSQL
 engine = create_engine(
-    settings.HANA_URL,
+    settings.DATABASE_URL,
     echo=True, # Log SQL queries for development
     pool_size=10,
     max_overflow=20

@@ -61,7 +61,8 @@ def seed_db():
                 "STATUS": "accepted",
                 "DOC_TYPE": "Standard Invoice",
                 "COUNTRY_CODE": "AO",
-                "COUNTRY_NAME": "Angola"
+                "COUNTRY_NAME": "Angola",
+                "HAS_ATTACHMENT": True
             },
             {
                 "DOC_ID": "FT FT3926S2781N/149",
@@ -71,7 +72,8 @@ def seed_db():
                 "STATUS": "rejected",
                 "DOC_TYPE": "Standard Invoice",
                 "COUNTRY_CODE": "AO",
-                "COUNTRY_NAME": "Angola"
+                "COUNTRY_NAME": "Angola",
+                "HAS_ATTACHMENT": False
             },
             {
                 "DOC_ID": "FT NG8801S1234N/08",
@@ -81,7 +83,8 @@ def seed_db():
                 "STATUS": "pending",
                 "DOC_TYPE": "Standard Invoice",
                 "COUNTRY_CODE": "NG",
-                "COUNTRY_NAME": "Nigeria"
+                "COUNTRY_NAME": "Nigeria",
+                "HAS_ATTACHMENT": True
             }
         ]
 

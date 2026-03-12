@@ -11,6 +11,8 @@ class Invoice(BaseModel):
     docType: str
     countryCode: str
     countryName: str
+    hasAttachment: bool
+    fileUrl: Optional[str] = None
 
 class InvoiceCreate(BaseModel):
     sourceReference: str
@@ -19,6 +21,7 @@ class InvoiceCreate(BaseModel):
     docType: str
     countryCode: str
     countryName: str
+    hasAttachment: Optional[bool] = False
 
 class InvoiceResponse(BaseModel):
     status: bool
