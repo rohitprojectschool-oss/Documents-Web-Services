@@ -73,9 +73,9 @@ async def get_invoices(
         )
 
         # Apply Filters
-        if status:
+        if status and status != 'all':
             query = query.where(Invoice.STATUS == status)
-        if countryCode:
+        if countryCode and countryCode != 'all':
             query = query.where(Invoice.COUNTRY_CODE == countryCode)
         if docType:
             query = query.where(Invoice.DOC_TYPE == docType)
