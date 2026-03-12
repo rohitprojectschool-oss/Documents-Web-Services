@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 from app.db.session import get_db
 from app.models.invoice import Invoice
 import random
@@ -10,14 +11,13 @@ from urllib.parse import quote, unquote
 
 router = APIRouter()
 
-def get_file_url(request: Request, inv: Invoice):
-    if not inv.HAS_ATTACHMENT or not inv.FILE_CONTENT:
+def get_file_url(inv_doc_id: str, has_attachment: bool):
+    if not has_attachment:
         return None
-    base_url = str(request.base_url).rstrip("/")
-    # We encode the space but keep the slash safe (safe='/') 
-    # so it matches the {doc_id:path} route logic.
-    safe_doc_id = quote(inv.DOC_ID, safe='/')
-    return f"{base_url}/api/invoices/{safe_doc_id}/file"
+    # Use a relative URL. The frontend will prepend the correct BASE_URL.
+    # This prevents the "localhost" issue in production.
+    safe_doc_id = quote(inv_doc_id, safe='/')
+    return f"/api/invoices/{safe_doc_id}/file"
 
 @router.get("/{doc_id:path}/file")
 async def download_document(doc_id: str, db: Session = Depends(get_db)):
@@ -37,14 +37,8 @@ async def download_document(doc_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="File content missing")
     
     # SANITIZATION: HTTP headers only support latin-1 characters. 
-    # Characters like \u202f (Narrow No-Break Space) from macOS screenshots cause 500 errors.
     original_filename = inv.FILE_NAME or "document"
-    
-    # 1. Create a safe ASCII-only version for the basic 'filename' parameter
     ascii_filename = original_filename.encode('ascii', 'ignore').decode('ascii') or "document"
-    
-    # 2. Use the full original name in the 'filename*' parameter (UTF-8 encoded)
-    # This is the modern standard that browsers use for special characters.
     filename_quoted = quote(original_filename)
     
     return Response(
@@ -56,30 +50,45 @@ async def download_document(doc_id: str, db: Session = Depends(get_db)):
     )
 
 @router.get("", response_model=InvoicesResponse)
-async def get_invoices(request: Request, db: Session = Depends(get_db)):
-    """Fetch all invoices from DB."""
+async def get_invoices(db: Session = Depends(get_db)):
+    """Fetch all invoices from DB efficiently."""
     try:
-        db_invoices = db.query(Invoice).all()
+        # PERFORMANCE FIX: We EXCLUDE FILE_CONTENT from the list query.
+        # Fetching 7MB blobs for every row in a list is what makes it "notoriously slow".
+        stmt = select(
+            Invoice.DOC_ID,
+            Invoice.SOURCE_REFERENCE,
+            Invoice.CUSTOMER_NAME,
+            Invoice.GROSS_AMOUNT,
+            Invoice.CREATED_AT,
+            Invoice.STATUS,
+            Invoice.DOC_TYPE,
+            Invoice.COUNTRY_CODE,
+            Invoice.COUNTRY_NAME,
+            Invoice.HAS_ATTACHMENT
+        )
+        results = db.execute(stmt).all()
+        
         invoices = [InvoiceSchema(
-            docId=inv.DOC_ID,
-            sourceReference=inv.SOURCE_REFERENCE or "",
-            customer=inv.CUSTOMER_NAME,
-            grossAmount=f"{float(inv.GROSS_AMOUNT):.2f}",
-            created=inv.CREATED_AT.strftime("%b %d, %Y"),
-            status=inv.STATUS,
-            docType=inv.DOC_TYPE,
-            countryCode=inv.COUNTRY_CODE,
-            countryName=inv.COUNTRY_NAME,
-            hasAttachment=inv.HAS_ATTACHMENT and inv.FILE_CONTENT is not None,
-            fileUrl=get_file_url(request, inv)
-        ) for inv in db_invoices]
+            docId=row.DOC_ID,
+            sourceReference=row.SOURCE_REFERENCE or "",
+            customer=row.CUSTOMER_NAME,
+            grossAmount=f"{float(row.GROSS_AMOUNT):.2f}",
+            created=row.CREATED_AT.strftime("%b %d, %Y"),
+            status=row.STATUS,
+            docType=row.DOC_TYPE,
+            countryCode=row.COUNTRY_CODE,
+            countryName=row.COUNTRY_NAME,
+            hasAttachment=row.HAS_ATTACHMENT,
+            fileUrl=get_file_url(row.DOC_ID, row.HAS_ATTACHMENT)
+        ) for row in results]
+        
         return InvoicesResponse(status=True, data=invoices)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.post("", response_model=InvoiceResponse)
 async def upload_invoice(
-    request: Request,
     sourceReference: str = Form(...),
     customer: str = Form(...),
     grossAmount: float = Form(...),
@@ -130,7 +139,7 @@ async def upload_invoice(
                 countryCode=new_invoice.COUNTRY_CODE,
                 countryName=new_invoice.COUNTRY_NAME,
                 hasAttachment=True,
-                fileUrl=get_file_url(request, new_invoice)
+                fileUrl=get_file_url(new_invoice.DOC_ID, True)
             )
         )
     except Exception as e:
